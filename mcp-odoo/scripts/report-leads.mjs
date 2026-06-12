@@ -203,7 +203,9 @@ if (rows.length) {
   console.log(
     "| # | Nome | Contatto/Azienda | Email | Telefono | Fonte | Commerciale | Stage | Creato (UTC) |",
   );
-  console.log("|---|------|------------------|-------|----------|-------|-------------|-------|--------------|");
+  console.log(
+    "|---|------|------------------|-------|----------|-------|-------------|-------|--------------|",
+  );
   rows.forEach((r, i) => {
     const contact = [val(r.contact_name), val(r.partner_name)]
       .filter(Boolean)

@@ -42,7 +42,13 @@ async function resolveInstance() {
   const user = finalUrl.searchParams.get("user") ?? "admin";
   const key = finalUrl.searchParams.get("key") ?? "admin";
   if (!db) throw new Error(`Could not parse demo db from redirect: ${res.url}`);
-  return { url: host, db, username: user, apiKey: key, source: "demo.odoo.com" };
+  return {
+    url: host,
+    db,
+    username: user,
+    apiKey: key,
+    source: "demo.odoo.com",
+  };
 }
 
 /** Query server version straight from Odoo (out-of-band, for the transcript). */
@@ -104,7 +110,12 @@ async function main() {
   try {
     section("1. listTools (MCP handshake)");
     const { tools } = await client.listTools();
-    log(`tools exposed : ${tools.map((t) => t.name).sort().join(", ")}`);
+    log(
+      `tools exposed : ${tools
+        .map((t) => t.name)
+        .sort()
+        .join(", ")}`,
+    );
 
     section("2. AUTH + READ — search_read res.partner (companies)");
     const partners = await callTool(client, "odoo_search_read", {
@@ -153,7 +164,9 @@ async function main() {
       log(`sale.order ids: ${JSON.stringify(soIds)} (${soIds.length} found)`);
     } catch (e) {
       log(`sale.order search note: ${e.message}`);
-      log("(Sales app may not be installed on this demo — model reachable check:)");
+      log(
+        "(Sales app may not be installed on this demo — model reachable check:)",
+      );
       const models = await callTool(client, "odoo_list_models", {
         filter: "sale.order",
       });

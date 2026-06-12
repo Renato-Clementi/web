@@ -40,12 +40,12 @@ All seven steps above succeeded over real JSON-RPC. Transcript is attached to
 
 Free hosted Odoo 18 with a usable external API turned out to be unavailable:
 
-| Path | Outcome |
-| --- | --- |
-| `demo.odoo.com` (Odoo Online SaaS) | Serves **saas~19.3**, not 18, **and** disables the external API (`/jsonrpc`, `/xmlrpc/2/*` → 404). Dead end. |
-| `runbot.odoo.com` 18.0 builds | Genuine Odoo **18.0** with `/jsonrpc` present, but the external API is **IP-gated**: `"Access denied from your location — use a development database"`. Dead end for off-network clients. |
-| Odoo.sh / Odoo Online **trial** pinned to 18 | Would expose the API, but requires account + email/GitHub signup (human verification). Not agent-executable. |
-| Docker (`docker-compose.yml`) | No Docker runtime available on the runner. |
+| Path                                         | Outcome                                                                                                                                                                                   |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo.odoo.com` (Odoo Online SaaS)           | Serves **saas~19.3**, not 18, **and** disables the external API (`/jsonrpc`, `/xmlrpc/2/*` → 404). Dead end.                                                                              |
+| `runbot.odoo.com` 18.0 builds                | Genuine Odoo **18.0** with `/jsonrpc` present, but the external API is **IP-gated**: `"Access denied from your location — use a development database"`. Dead end for off-network clients. |
+| Odoo.sh / Odoo Online **trial** pinned to 18 | Would expose the API, but requires account + email/GitHub signup (human verification). Not agent-executable.                                                                              |
+| Docker (`docker-compose.yml`)                | No Docker runtime available on the runner.                                                                                                                                                |
 
 So the validation used a **self-hosted Odoo 18 from source on the runner**, at
 zero cost and with no human in the loop:
