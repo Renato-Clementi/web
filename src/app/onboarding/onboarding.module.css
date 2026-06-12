@@ -1,0 +1,133 @@
+.screen {
+  display: flex;
+  flex: 1;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background-color: #fafafa;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 40px;
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 16px;
+}
+
+.kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #111;
+}
+
+.subtitle {
+  font-size: 15px;
+  line-height: 24px;
+  color: #666;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111;
+}
+
+.input {
+  height: 44px;
+  padding: 0 14px;
+  font-size: 15px;
+  border: 1px solid #d8d8d8;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #111;
+}
+
+.error {
+  font-size: 13px;
+  color: #c0392b;
+}
+
+.submit {
+  margin-top: 8px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fafafa;
+  background: #111;
+  border: 1px solid transparent;
+  border-radius: 128px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.submit:hover:not(:disabled) {
+  background: #383838;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (prefers-color-scheme: dark) {
+  .screen {
+    background-color: #0a0a0a;
+  }
+  .card {
+    background: #111;
+    border-color: #222;
+  }
+  .title {
+    color: #ededed;
+  }
+  .subtitle {
+    color: #999;
+  }
+  .label {
+    color: #ededed;
+  }
+  .input {
+    background: #0a0a0a;
+    border-color: #333;
+    color: #ededed;
+  }
+  .input:focus {
+    border-color: #ededed;
+  }
+  .submit {
+    color: #0a0a0a;
+    background: #ededed;
+  }
+  .submit:hover:not(:disabled) {
+    background: #ccc;
+  }
+}

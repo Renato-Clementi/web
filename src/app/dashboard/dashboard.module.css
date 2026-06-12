@@ -1,0 +1,141 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #fafafa;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 24px;
+  background: #fff;
+  border-bottom: 1px solid #ebebeb;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #111;
+}
+
+.org {
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #444;
+  background: #f2f2f2;
+  border-radius: 999px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.email {
+  font-size: 13px;
+  color: #666;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.empty {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+}
+
+.title {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #111;
+}
+
+.subtitle {
+  font-size: 16px;
+  line-height: 26px;
+  color: #666;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111;
+  border: 1px solid #ebebeb;
+  border-radius: 128px;
+  transition: 0.2s;
+}
+
+.secondary:hover {
+  background: #f2f2f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  .shell {
+    background-color: #0a0a0a;
+  }
+  .topbar {
+    background: #111;
+    border-color: #222;
+  }
+  .logo {
+    color: #ededed;
+  }
+  .org {
+    color: #ccc;
+    background: #1a1a1a;
+  }
+  .email {
+    color: #999;
+  }
+  .title {
+    color: #ededed;
+  }
+  .subtitle {
+    color: #999;
+  }
+  .secondary {
+    color: #ededed;
+    border-color: #1a1a1a;
+  }
+  .secondary:hover {
+    background: #1a1a1a;
+  }
+}

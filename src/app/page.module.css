@@ -38,6 +38,14 @@
   gap: 24px;
 }
 
+.kicker {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
 .intro h1 {
   max-width: 320px;
   font-size: 40px;

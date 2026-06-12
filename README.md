@@ -19,15 +19,16 @@ documented "fresh clone → app runs locally" path.
 
 ## Stack & rationale
 
-| Choice                       | What                       | Why                                                                                                                                                                                                                        |
-| ---------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **TypeScript**               | Language                   | Type safety across the whole stack; the default for mainstream web work.                                                                                                                                                   |
-| **Next.js (App Router)**     | Full-stack React framework | Mainstream, batteries-included (routing, SSR/SSG, API routes, server actions). Direction-agnostic: works for marketing pages, dashboards, and APIs alike, so we don't have to re-platform when product direction firms up. |
-| **React 19**                 | UI library                 | Industry standard; largest ecosystem and hiring pool.                                                                                                                                                                      |
-| **ESLint**                   | Linting                    | Ships with the Next.js config; catches correctness issues.                                                                                                                                                                 |
-| **Prettier**                 | Formatting                 | Opinionated, zero-debate formatting. `eslint-config-prettier` disables conflicting ESLint rules.                                                                                                                           |
-| **Vitest + Testing Library** | Unit/component tests       | Fast, Vite-native runner with the React Testing Library for component tests. Tests live next to source as `*.test.tsx`.                                                                                                    |
-| **GitHub Actions**           | CI                         | On every push/PR to `main`: install → format check → lint → build → test.                                                                                                                                                  |
+| Choice                       | What                       | Why                                                                                                                                                                                                                              |
+| ---------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TypeScript**               | Language                   | Type safety across the whole stack; the default for mainstream web work.                                                                                                                                                         |
+| **Next.js (App Router)**     | Full-stack React framework | Mainstream, batteries-included (routing, SSR/SSG, API routes, server actions). Direction-agnostic: works for marketing pages, dashboards, and APIs alike, so we don't have to re-platform when product direction firms up.       |
+| **React 19**                 | UI library                 | Industry standard; largest ecosystem and hiring pool.                                                                                                                                                                            |
+| **ESLint**                   | Linting                    | Ships with the Next.js config; catches correctness issues.                                                                                                                                                                       |
+| **Prettier**                 | Formatting                 | Opinionated, zero-debate formatting. `eslint-config-prettier` disables conflicting ESLint rules.                                                                                                                                 |
+| **Vitest + Testing Library** | Unit/component tests       | Fast, Vite-native runner with the React Testing Library for component tests. Tests live next to source as `*.test.tsx`.                                                                                                          |
+| **GitHub Actions**           | CI                         | On every push/PR to `main`: install → format check → lint → build → test.                                                                                                                                                        |
+| **Clerk**                    | Auth / identity            | Standalone identity layer (sign-up, login, sessions, hosted UI) that doesn't assume it owns our DB — the right fit for a self-managed Postgres. Tenancy stays in our own tables. See [ADR 0001](docs/adr/0001-auth-provider.md). |
 
 We deliberately picked the most mainstream option at each layer rather than
 anything novel. The goal at this stage is throughput and low onboarding cost,
@@ -39,11 +40,18 @@ specific hosting provider or database.
 ```
 .
 ├── src/
+│   ├── middleware.ts   # Clerk route protection (/dashboard, /onboarding)
 │   ├── app/            # Next.js App Router (routes, layouts, pages)
-│   │   ├── layout.tsx  # root layout + metadata
-│   │   ├── page.tsx    # placeholder home page
+│   │   ├── layout.tsx  # root layout + <ClerkProvider> + metadata
+│   │   ├── page.tsx    # marketing landing (sign-up / sign-in CTAs)
+│   │   ├── (auth)/     # Clerk-hosted sign-in / sign-up routes
+│   │   ├── onboarding/ # create-org flow (first run)
+│   │   ├── dashboard/  # authenticated app shell
 │   │   └── globals.css # global styles
-│   └── lib/db/         # tenant-scoped Postgres access layer (withOrg/…)
+│   └── lib/
+│       ├── auth/       # provider-neutral auth: identity, onboarding, context
+│       └── db/         # tenant-scoped Postgres access layer (withOrg/…)
+├── docs/adr/           # architecture decision records (0001 = auth provider)
 ├── db/                 # SQL migrations, runner, smoke test (see db/README.md)
 ├── public/             # static assets served at /
 ├── eslint.config.mjs   # ESLint flat config (Next + Prettier)
@@ -108,3 +116,32 @@ Data source precedence (`src/lib/leads/source.ts`):
 
 Aggregation lives in `src/lib/leads/aggregate.ts` (pure, unit-tested; bucketing
 is UTC-based, with a business-timezone refinement noted as a follow-up).
+
+### Auth & org onboarding
+
+Sign-up, login, and sessions are handled by **Clerk** — chosen over Supabase
+Auth because our datastore is a self-managed Postgres + pgvector and Clerk is a
+standalone identity layer that doesn't assume it owns the DB. Full rationale and
+the lock-in-containment plan: [`docs/adr/0001-auth-provider.md`](docs/adr/0001-auth-provider.md).
+
+Flow: `/sign-up` → email verify (Clerk) → `/onboarding` (name your org) →
+`/dashboard` (authenticated shell). Routes under `/dashboard` and `/onboarding`
+are protected by `src/middleware.ts`; the session persists across reloads.
+
+Key boundary — **our Postgres is the source of truth for tenancy**, not Clerk:
+
+- `orgs` / `memberships` / `users` (BAB-15) model orgs and roles; Clerk only
+  authenticates. The signed-in Clerk user is mirrored into `users` with
+  `auth_provider`/`auth_subject` on first request.
+- The provider is isolated behind a thin adapter so a swap stays cheap. Only
+  three files import the Clerk SDK: `src/app/layout.tsx` (`<ClerkProvider>`),
+  `src/middleware.ts`, and `src/lib/auth/identity.ts` (`getAuthIdentity()` →
+  provider-neutral `AuthIdentity`). The rest of the app uses our own model via
+  `src/lib/auth/context.ts` (`getAppContext()`).
+- Onboarding (find-or-create user, create org + owner membership) lives in
+  `src/lib/auth/onboarding.ts`, unit-tested in `onboarding.test.ts`. It runs
+  under `withServiceRole` because it spans tenants before any org exists.
+
+`next build` and unit tests run **without** Clerk keys. Live sign-in/up needs
+real keys at runtime — set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and
+`CLERK_SECRET_KEY` (see `.env.example`).
