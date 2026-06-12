@@ -28,7 +28,10 @@ interface OdooEnv {
 function readOdooEnv(): OdooEnv | null {
   const url = process.env.ODOO_URL?.trim().replace(/\/+$/, "");
   const db = process.env.ODOO_DB?.trim();
-  const username = process.env.ODOO_USERNAME?.trim();
+  // Accept ODOO_USER as an alias for ODOO_USERNAME (the connector/report use
+  // ODOO_USERNAME; some secret stores provision it as ODOO_USER).
+  const username =
+    process.env.ODOO_USERNAME?.trim() || process.env.ODOO_USER?.trim();
   const apiKey = process.env.ODOO_API_KEY?.trim();
   if (!url || !db || !username || !apiKey) return null;
   const timeoutMs = Number.parseInt(process.env.ODOO_TIMEOUT_MS ?? "", 10);
