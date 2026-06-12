@@ -117,6 +117,21 @@ ODOO_URL=http://localhost:8069 ODOO_DB=baboo ODOO_USERNAME=admin ODOO_API_KEY=..
 
 > **Multi-database / SaaS hosts:** the client always sends an `X-Odoo-Database` header so `/jsonrpc` resolves the right database on multi-tenant or reverse-proxied deployments (Odoo SaaS otherwise replies `404 — No database is selected`). Harmless for single-database instances.
 
+## Daily lead report (`scripts/report-leads.mjs`)
+
+Repeatable report of `crm.lead` records created on a given calendar day (default: **yesterday**) in the business timezone. Reuses the connector's `OdooClient` and the same `ODOO_*` env vars — no credentials are hard-coded. Writes a CSV and prints a markdown summary (table + total count) to stdout.
+
+```bash
+npm run build
+ODOO_URL=… ODOO_DB=… ODOO_USERNAME=… ODOO_API_KEY=… \
+  node scripts/report-leads.mjs --days-ago 1 --tz Europe/Rome --out leads-yesterday.csv
+```
+
+- Odoo stores datetimes in **UTC**. The script computes the UTC instants bounding the local business day `[00:00:00, next-day 00:00:00)` (DST-aware via `Intl.DateTimeFormat`) and filters `create_date` with `>=` / `<` (half-open, no double counting).
+- `crm.lead` covers both leads and opportunities; the `type` column distinguishes them.
+- Fields reported: name, contact_name, partner_name (company), email_from, phone, source_id, user_id (salesperson), stage_id, type, create_date.
+- Exit code `2` with an explicit "missing variable" message when `ODOO_*` config is absent — safe to wire into a cron once credentials exist.
+
 ## Architecture
 
 ```
