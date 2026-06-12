@@ -88,14 +88,25 @@ jobs:
           SQL
 
       - name: Smoke test (application role — RLS enforced)
-        run: DATABASE_URL="$APP_DATABASE_URL" npm run db:smoke
+        continue-on-error: true # TEMP (BAB-17 diag): let kb:smoke run too so both errors surface
+        run: |
+          set -o pipefail
+          if ! DATABASE_URL="$APP_DATABASE_URL" npm run db:smoke 2>&1 | tee /tmp/db-smoke.log; then
+            echo "::error title=db:smoke failed::$(python3 -c "print(open('/tmp/db-smoke.log').read()[-3500:].replace('%','%25').replace(chr(13),'').replace(chr(10),'%0A'))")"
+            exit 1
+          fi
 
       # BAB-17 acceptance: ingest sample docs + tickets CSV → embedded chunks →
       # relevant retrieval with source refs. Runs as the non-privileged app_user
       # so kb-smoke's tenant-isolation assertion is real. No VOYAGE_API_KEY in
       # CI, so it uses the deterministic hashing embedding provider.
       - name: KB ingestion smoke test (application role — RLS enforced)
-        run: DATABASE_URL="$APP_DATABASE_URL" npx tsx db/kb-smoke.ts
+        run: |
+          set -o pipefail
+          if ! DATABASE_URL="$APP_DATABASE_URL" npx tsx db/kb-smoke.ts 2>&1 | tee /tmp/kb-smoke.log; then
+            echo "::error title=kb:smoke failed::$(python3 -c "print(open('/tmp/kb-smoke.log').read()[-3500:].replace('%','%25').replace(chr(13),'').replace(chr(10),'%0A'))")"
+            exit 1
+          fi
 
   mcp-odoo:
     name: mcp-odoo · install · typecheck · build · test
