@@ -81,3 +81,23 @@ cp .env.example .env.local
 | `npm run lint`         | Run ESLint.                                       |
 | `npm run format`       | Format the codebase with Prettier (writes files). |
 | `npm run format:check` | Check formatting without writing (CI-friendly).   |
+
+## Features
+
+### Leads dashboard — `/dashboard/leads`
+
+Lead trends over time for the board: a primary "leads per day/week/month" chart
+with a selectable date range, headline KPIs (total leads, leads in the selected
+period, period-over-period % change), and a breakdown by source / stage / type.
+
+Data source precedence (`src/lib/leads/source.ts`):
+
+1. **Live Odoo** — reads `crm.lead` over JSON-RPC when `ODOO_URL`, `ODOO_DB`,
+   `ODOO_USERNAME`, and `ODOO_API_KEY` are set (see `.env.example`). This is the
+   same self-managed Odoo 18 source the `mcp-odoo/` connector targets.
+2. **Demo data** — deterministic synthetic leads otherwise, with an explicit
+   in-app banner so demo data is never mistaken for production. Connecting a
+   live Odoo is the only remaining step to show real numbers.
+
+Aggregation lives in `src/lib/leads/aggregate.ts` (pure, unit-tested; bucketing
+is UTC-based, with a business-timezone refinement noted as a follow-up).
