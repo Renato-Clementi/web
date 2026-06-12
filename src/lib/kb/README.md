@@ -62,9 +62,9 @@ Real session auth + org scoping land in [BAB-16]. Until then these routes are
 `x-internal-key` header (`orgId` comes from the trusted caller — do not expose
 publicly before BAB-16):
 
-- `POST /api/kb/ingest` → `202 { jobId, knowledgeSourceId }`. Body:
-  `{ orgId, kind: "docs"|"tickets", source: {type,name,config?},
-   documents?: [...] | ticketsCsv?: string, columnMapping?, chunkOptions? }`.
+- `POST /api/kb/ingest` → `202 { jobId, knowledgeSourceId }`. Body: `orgId`,
+  `kind` (`"docs"|"tickets"`), `source` (`{type,name,config?}`), plus either
+  `documents[]` or `ticketsCsv` (and optional `columnMapping`, `chunkOptions`).
 - `GET /api/kb/jobs/{jobId}?orgId=...` → the job row (status + progress).
 
 ## Verify (acceptance)
