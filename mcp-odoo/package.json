@@ -1,0 +1,33 @@
+{
+  "name": "@baboo/mcp-odoo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP (Model Context Protocol) server for Odoo 18 — lets AI agents read and operate on Odoo data over JSON-RPC.",
+  "type": "module",
+  "bin": {
+    "baboo-mcp-odoo": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

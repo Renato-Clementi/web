@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone packages own their toolchain/CI (see mcp-odoo job in CI).
+    "mcp-odoo/**",
   ]),
 ]);
 

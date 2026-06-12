@@ -1,0 +1,33 @@
+# Local Odoo 18 + Postgres for live integration testing.
+#
+#   docker compose up -d
+#   open http://localhost:8069   # create a database (e.g. "baboo"), set admin password
+#   In Odoo: Settings > Users, enable Developer mode, create an API key under
+#   Preferences > Account Security. Then run the live test (see README).
+#
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - odoo-db:/var/lib/postgresql/data
+
+  odoo:
+    image: odoo:18
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: odoo
+    volumes:
+      - odoo-data:/var/lib/odoo
+
+volumes:
+  odoo-db:
+  odoo-data:
