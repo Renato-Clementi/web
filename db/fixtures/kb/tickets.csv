@@ -1,0 +1,6 @@
+Ticket ID,Subject,Description,Resolution,Status
+2001,Cannot log in,"I keep getting ""invalid credentials"" even with the right password.","Have the customer reset their password from Settings -> Security. The reset link is valid for 30 minutes.",resolved
+2002,Where is my refund,"I returned an item last week but haven't seen the money.","Refunds go back to the original payment method within five business days. Confirmed the refund was issued.",closed
+2003,Change VAT number on invoice,"Our company VAT number is wrong on the invoice.","Update VAT details under Settings -> Billing -> Payment method; invoices regenerate automatically.",resolved
+2004,Feature request: dark mode,"It would be great to have a dark theme.","",open
+2005,Package not delivered,"My order shipped 8 days ago and still hasn't arrived.","Opened a carrier investigation using the tracking number from the Orders page; reship if unrecovered in 3 days.",solved

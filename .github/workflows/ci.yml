@@ -90,6 +90,13 @@ jobs:
       - name: Smoke test (application role — RLS enforced)
         run: DATABASE_URL="$APP_DATABASE_URL" npm run db:smoke
 
+      # BAB-17 acceptance: ingest sample docs + tickets CSV → embedded chunks →
+      # relevant retrieval with source refs. Runs as the non-privileged app_user
+      # so kb-smoke's tenant-isolation assertion is real. No VOYAGE_API_KEY in
+      # CI, so it uses the deterministic hashing embedding provider.
+      - name: KB ingestion smoke test (application role — RLS enforced)
+        run: DATABASE_URL="$APP_DATABASE_URL" npx tsx db/kb-smoke.ts
+
   mcp-odoo:
     name: mcp-odoo · install · typecheck · build · test
     runs-on: ubuntu-latest
