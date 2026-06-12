@@ -39,10 +39,12 @@ specific hosting provider or database.
 ```
 .
 ├── src/
-│   └── app/            # Next.js App Router (routes, layouts, pages)
-│       ├── layout.tsx  # root layout + metadata
-│       ├── page.tsx    # placeholder home page
-│       └── globals.css # global styles
+│   ├── app/            # Next.js App Router (routes, layouts, pages)
+│   │   ├── layout.tsx  # root layout + metadata
+│   │   ├── page.tsx    # placeholder home page
+│   │   └── globals.css # global styles
+│   └── lib/db/         # tenant-scoped Postgres access layer (withOrg/…)
+├── db/                 # SQL migrations, runner, smoke test (see db/README.md)
 ├── public/             # static assets served at /
 ├── eslint.config.mjs   # ESLint flat config (Next + Prettier)
 ├── .prettierrc.json    # Prettier formatting rules
@@ -73,14 +75,19 @@ cp .env.example .env.local
 
 ## Scripts
 
-| Command                | Does                                              |
-| ---------------------- | ------------------------------------------------- |
-| `npm run dev`          | Start the local dev server on port 3000.          |
-| `npm run build`        | Production build (also type-checks).              |
-| `npm run start`        | Serve the production build.                       |
-| `npm run lint`         | Run ESLint.                                       |
-| `npm run format`       | Format the codebase with Prettier (writes files). |
-| `npm run format:check` | Check formatting without writing (CI-friendly).   |
+| Command                | Does                                                  |
+| ---------------------- | ----------------------------------------------------- |
+| `npm run dev`          | Start the local dev server on port 3000.              |
+| `npm run build`        | Production build (also type-checks).                  |
+| `npm run start`        | Serve the production build.                           |
+| `npm run lint`         | Run ESLint.                                           |
+| `npm run format`       | Format the codebase with Prettier (writes files).     |
+| `npm run format:check` | Check formatting without writing (CI-friendly).       |
+| `npm run db:migrate`   | Apply `db/migrations/*.sql` (needs `DATABASE_URL`).   |
+| `npm run db:smoke`     | Schema smoke test against a live DB (`DATABASE_URL`). |
+
+The data model (multi-tenant Postgres + pgvector) is documented in
+[`db/README.md`](db/README.md).
 
 ## Features
 
