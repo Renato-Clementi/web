@@ -24,9 +24,24 @@ interface OdooEnv {
   maxLimit: number;
 }
 
+/**
+ * Normalize an Odoo base URL down to the host root that serves `/jsonrpc`.
+ *
+ * Odoo's JSON-RPC endpoint always lives at the host root (`https://host/jsonrpc`),
+ * but the configured URL often points at the web client backend
+ * (`https://host/odoo`, the Odoo 18 default landing path) or carries a trailing
+ * slash. Hitting `https://host/odoo/jsonrpc` routes to a web controller that
+ * demands a CSRF token and 400s ("Session expired (invalid CSRF token)"), so we
+ * strip any trailing slash and a trailing `/odoo` (or legacy `/web`) segment.
+ */
+export function normalizeOdooUrl(raw: string): string {
+  return raw.replace(/\/+$/, "").replace(/\/(odoo|web)$/i, "");
+}
+
 /** Read ODOO_* env, or return null if the required vars aren't all present. */
 function readOdooEnv(): OdooEnv | null {
-  const url = process.env.ODOO_URL?.trim().replace(/\/+$/, "");
+  const rawUrl = process.env.ODOO_URL?.trim();
+  const url = rawUrl ? normalizeOdooUrl(rawUrl) : undefined;
   const db = process.env.ODOO_DB?.trim();
   // Accept ODOO_USER as an alias for ODOO_USERNAME (the connector/report use
   // ODOO_USERNAME; some secret stores provision it as ODOO_USER).
