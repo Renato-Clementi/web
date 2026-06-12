@@ -19,13 +19,15 @@ documented "fresh clone → app runs locally" path.
 
 ## Stack & rationale
 
-| Choice                 | What                              | Why                                                                                              |
-| ---------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **TypeScript**         | Language                          | Type safety across the whole stack; the default for mainstream web work.                         |
-| **Next.js (App Router)** | Full-stack React framework      | Mainstream, batteries-included (routing, SSR/SSG, API routes, server actions). Direction-agnostic: works for marketing pages, dashboards, and APIs alike, so we don't have to re-platform when product direction firms up. |
-| **React 19**           | UI library                        | Industry standard; largest ecosystem and hiring pool.                                            |
-| **ESLint**             | Linting                           | Ships with the Next.js config; catches correctness issues.                                       |
-| **Prettier**           | Formatting                        | Opinionated, zero-debate formatting. `eslint-config-prettier` disables conflicting ESLint rules. |
+| Choice                       | What                       | Why                                                                                                                                                                                                                        |
+| ---------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **TypeScript**               | Language                   | Type safety across the whole stack; the default for mainstream web work.                                                                                                                                                   |
+| **Next.js (App Router)**     | Full-stack React framework | Mainstream, batteries-included (routing, SSR/SSG, API routes, server actions). Direction-agnostic: works for marketing pages, dashboards, and APIs alike, so we don't have to re-platform when product direction firms up. |
+| **React 19**                 | UI library                 | Industry standard; largest ecosystem and hiring pool.                                                                                                                                                                      |
+| **ESLint**                   | Linting                    | Ships with the Next.js config; catches correctness issues.                                                                                                                                                                 |
+| **Prettier**                 | Formatting                 | Opinionated, zero-debate formatting. `eslint-config-prettier` disables conflicting ESLint rules.                                                                                                                           |
+| **Vitest + Testing Library** | Unit/component tests       | Fast, Vite-native runner with the React Testing Library for component tests. Tests live next to source as `*.test.tsx`.                                                                                                    |
+| **GitHub Actions**           | CI                         | On every push/PR to `main`: install → format check → lint → build → test.                                                                                                                                                  |
 
 We deliberately picked the most mainstream option at each layer rather than
 anything novel. The goal at this stage is throughput and low onboarding cost,
