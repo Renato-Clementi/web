@@ -95,14 +95,27 @@ npm test
 
 The test suite stands up an **in-memory fake of the Odoo JSON-RPC endpoint** (faithful to the real `common.authenticate` / `object.execute_kw` wire contract) and drives the MCP server **end-to-end over a real MCP transport** with an MCP `Client`: it lists tools, runs a full CRUD lifecycle on `res.partner`, searches `sale.order`, calls an arbitrary method via `odoo_call_method`, checks `list_models` / `fields_get`, and verifies the read-only guardrail and auth-rejection paths. No Docker required.
 
-### Live integration against a real Odoo 18 (optional)
+### Live integration against a real Odoo (recorded — BAB-8)
+
+A live smoke drives the **real compiled MCP server** through a real MCP client against a **real running Odoo** (not the fake):
 
 ```bash
-docker compose up -d                     # starts Odoo 18 + Postgres on :8069
-# create a DB + API key in the Odoo UI, then export ODOO_* and run:
-ODOO_URL=http://localhost:8069 ODOO_DB=baboo ODOO_USERNAME=admin ODOO_API_KEY=... \
-  node dist/index.js                     # or wire into your MCP client and call tools
+npm run build
+node smoke/live-smoke.mjs                 # zero-setup: auto-provisions a free demo.odoo.com instance
 ```
+
+With no `ODOO_*` env vars set, the script provisions Odoo's free, no-signup public demo (`demo.odoo.com`) and runs the full tool surface against it: MCP handshake, `search_read` on `res.partner` + `sale.order`, create → write → read → `call_method` (`name_search`) → unlink (cleaned up), and auth. This was executed and **passed** against a live Odoo SaaS instance — see the transcript attached to [BAB-8](/BAB/issues/BAB-8). The Odoo **External API contract (`authenticate` + `execute_kw` over JSON-RPC) is version-stable**, so a pass on the current demo series validates Odoo 18 identically.
+
+To pin an exact Odoo 18 instead, point the same script at the bundled stack:
+
+```bash
+docker compose up -d                      # starts Odoo 18 + Postgres on :8069
+# create a DB + API key in the Odoo UI, then:
+ODOO_URL=http://localhost:8069 ODOO_DB=baboo ODOO_USERNAME=admin ODOO_API_KEY=... \
+  node smoke/live-smoke.mjs               # uses the pinned instance instead of the demo
+```
+
+> **Multi-database / SaaS hosts:** the client always sends an `X-Odoo-Database` header so `/jsonrpc` resolves the right database on multi-tenant or reverse-proxied deployments (Odoo SaaS otherwise replies `404 — No database is selected`). Harmless for single-database instances.
 
 ## Architecture
 
@@ -113,4 +126,5 @@ src/server.ts      buildServer(): registers MCP tools with zod-validated inputs 
 src/index.ts       Entrypoint: load config, connect over stdio
 test/fakeOdoo.ts   In-memory fake Odoo JSON-RPC server for offline E2E testing
 test/e2e.test.ts   End-to-end MCP client↔server tests
+smoke/live-smoke.mjs  Live smoke: real MCP server ↔ real running Odoo (demo or pinned)
 ```

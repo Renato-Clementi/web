@@ -50,6 +50,10 @@ export class OdooClient {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          // Disambiguate the target database on multi-tenant / reverse-proxied
+          // Odoo hosts (e.g. Odoo SaaS), where `/jsonrpc` otherwise 404s with
+          // "No database is selected". Harmless for single-database instances.
+          "X-Odoo-Database": this.config.db,
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
