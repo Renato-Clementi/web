@@ -152,6 +152,95 @@ describe("runSync", () => {
     expect(report.hadErrors).toBe(false); // a forgotten punch is not an error
   });
 
+  // --- BAB-89: robust pairing of out-of-order / mislabeled punches ----------
+  const hrDirectory: EmployeeDirectoryEntry[] = [
+    { id: 7, barcode: "B7", workEmail: "lorenzo@baboo.eu" },
+    { id: 17, barcode: "B17", workEmail: "tommaso@baboo.eu" },
+  ];
+  const juneOpts = {
+    rangeStartIso: "2026-06-12T00:00:00Z",
+    rangeEndIso: "2026-06-13T00:00:00Z",
+    now: () => new Date("2026-06-13T01:00:00Z"),
+  };
+
+  it("recovers Lorenzo's scrambled day (12/06) without a 0h record", async () => {
+    // IN07:25 OUT13:44 OUT14:40 IN15:40 — double-out closing on an in.
+    const odoo = new FakeOdoo(hrDirectory);
+    const data: FluidaExport = {
+      punches: [
+        { badge: "B7", timestamp: "2026-06-12T07:25:00+02:00", direction: "in" },
+        { badge: "B7", timestamp: "2026-06-12T13:44:00+02:00", direction: "out" },
+        { badge: "B7", timestamp: "2026-06-12T14:40:00+02:00", direction: "out" },
+        { badge: "B7", timestamp: "2026-06-12T15:40:00+02:00", direction: "in" },
+      ],
+      leaves: [],
+    };
+    const report = await runSync(fixedSource(data), odoo, juneOpts);
+
+    // Two valid intervals written; neither is a degenerate 0h record.
+    expect(report.attendance.created).toBe(2);
+    expect(odoo.attendance).toHaveLength(2);
+    expect(odoo.attendance.every((a) => a.checkIn !== a.checkOut)).toBe(true);
+    expect(odoo.attendance.map((a) => [a.checkIn, a.checkOut])).toEqual([
+      ["2026-06-12 05:25:00", "2026-06-12 11:44:00"],
+      ["2026-06-12 12:40:00", "2026-06-12 13:40:00"],
+    ]);
+    // The anomalous day is logged to the JSON channel for Chronos (HR).
+    expect(
+      report.logs.some(
+        (l) =>
+          l.level === "warn" &&
+          JSON.stringify(l.context ?? {}).includes("mislabeled"),
+      ),
+    ).toBe(true);
+    expect(report.hadErrors).toBe(false);
+  });
+
+  it("recovers Tommaso's inverted day (12/06) without a 0h record", async () => {
+    // OUT07:17 IN18:27 — directions inverted.
+    const odoo = new FakeOdoo(hrDirectory);
+    const data: FluidaExport = {
+      punches: [
+        { badge: "B17", timestamp: "2026-06-12T07:17:00+02:00", direction: "out" },
+        { badge: "B17", timestamp: "2026-06-12T18:27:00+02:00", direction: "in" },
+      ],
+      leaves: [],
+    };
+    const report = await runSync(fixedSource(data), odoo, juneOpts);
+
+    expect(report.attendance.created).toBe(1);
+    expect(odoo.attendance).toHaveLength(1);
+    expect(odoo.attendance[0]).toMatchObject({
+      employeeId: 17,
+      checkIn: "2026-06-12 05:17:00",
+      checkOut: "2026-06-12 16:27:00",
+    });
+    expect(odoo.attendance[0].checkIn).not.toBe(odoo.attendance[0].checkOut);
+    expect(report.hadErrors).toBe(false);
+  });
+
+  it("never writes a 0h record on a dry-run over the mislabeled days", async () => {
+    const odoo = new FakeOdoo(hrDirectory);
+    const data: FluidaExport = {
+      punches: [
+        { badge: "B7", timestamp: "2026-06-12T07:25:00+02:00", direction: "in" },
+        { badge: "B7", timestamp: "2026-06-12T13:44:00+02:00", direction: "out" },
+        { badge: "B7", timestamp: "2026-06-12T14:40:00+02:00", direction: "out" },
+        { badge: "B7", timestamp: "2026-06-12T15:40:00+02:00", direction: "in" },
+        { badge: "B17", timestamp: "2026-06-12T07:17:00+02:00", direction: "out" },
+        { badge: "B17", timestamp: "2026-06-12T18:27:00+02:00", direction: "in" },
+      ],
+      leaves: [],
+    };
+    const report = await runSync(fixedSource(data), odoo, {
+      ...juneOpts,
+      dryRun: true,
+    });
+    expect(report.dryRun).toBe(true);
+    expect(report.attendance.created).toBe(3); // 2 Lorenzo + 1 Tommaso
+    expect(odoo.attendance).toHaveLength(0); // dry-run: nothing persisted
+  });
+
   it("records a fatal source error without throwing", async () => {
     const broken: FluidaSource = {
       name: "broken",
