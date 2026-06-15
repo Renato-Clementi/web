@@ -31,11 +31,16 @@ function flag(name: string): boolean {
 async function buildSource(): Promise<FluidaSource> {
   const apiKey = process.env.FLUIDA_API_KEY?.trim();
   if (apiKey) {
+    const companyId = process.env.FLUIDA_COMPANY_ID?.trim();
+    if (!companyId) {
+      throw new Error(
+        "FLUIDA_API_KEY is set but FLUIDA_COMPANY_ID is missing (needed for the {company_id} path segment).",
+      );
+    }
     return new FluidaApiSource({
       baseUrl: process.env.FLUIDA_API_URL?.trim() || "https://api.fluida.io",
       apiKey,
-      punchesPath: process.env.FLUIDA_PUNCHES_PATH,
-      leavesPath: process.env.FLUIDA_LEAVES_PATH,
+      companyId,
     });
   }
   const punchesPath = process.env.FLUIDA_PUNCHES_CSV?.trim();
@@ -105,6 +110,7 @@ async function main(): Promise<void> {
         attendance: report.attendance,
         leave: report.leave,
         unmatched: report.unmatched.length,
+        incompleteForReview: report.incompleteForReview.length,
       },
     }),
   );

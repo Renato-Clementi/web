@@ -109,6 +109,16 @@ export interface SyncReport {
   };
   leave: { created: number; updated: number; skipped: number };
   unmatched: { badge: string; email?: string; kind: "punch" | "leave" }[];
+  /**
+   * Intervals NOT written because they lack a check-out (forgotten punches).
+   * Reported to HR (Chronos) for manual correction rather than fabricating a
+   * check-out or leaving an open record that blocks later attendances in Odoo.
+   */
+  incompleteForReview: {
+    employeeId: number;
+    checkIn: string;
+    reason: string;
+  }[];
   logs: LogEntry[];
   /** True when at least one error-level log was recorded. */
   hadErrors: boolean;

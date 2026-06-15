@@ -49,6 +49,7 @@ export async function runSync(
     attendance: { created: 0, updated: 0, skipped: 0, incomplete: 0 },
     leave: { created: 0, updated: 0, skipped: 0 },
     unmatched: [],
+    incompleteForReview: [],
     logs,
     hadErrors: false,
   };
@@ -116,6 +117,18 @@ export async function runSync(
           warnings: iv.warnings,
         });
       }
+      // A check-out-less (forgotten) punch is never written: Odoo only allows
+      // one open attendance per employee, so an open historical record both
+      // blocks later attendances and records a shift with no end. Report it for
+      // HR to correct in Fluida/Odoo instead of fabricating a check-out.
+      if (iv.checkOut === null) {
+        report.incompleteForReview.push({
+          employeeId: iv.employeeId,
+          checkIn: iv.checkIn,
+          reason: iv.warnings.join("; ") || "missing check-out",
+        });
+        continue;
+      }
       try {
         const existing = await odoo.findAttendance(iv.employeeId, iv.checkIn);
         if (existing != null) {
@@ -177,10 +190,18 @@ export async function runSync(
       }
     }
 
+    if (report.incompleteForReview.length) {
+      log("warn", "Forgotten-checkout punches not written — HR review needed", {
+        count: report.incompleteForReview.length,
+        items: report.incompleteForReview,
+      });
+    }
+
     log("info", "Sync complete", {
       attendance: report.attendance,
       leave: report.leave,
       unmatched: report.unmatched.length,
+      incompleteForReview: report.incompleteForReview.length,
     });
   } catch (err) {
     log("error", "Sync aborted with a fatal error", { error: errMsg(err) });

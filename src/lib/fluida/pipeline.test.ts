@@ -130,6 +130,28 @@ describe("runSync", () => {
     expect(odoo.leaves).toHaveLength(0);
   });
 
+  it("reports forgotten-checkout punches for review instead of writing them", async () => {
+    const odoo = new FakeOdoo(directory);
+    const forgotten: FluidaExport = {
+      punches: [
+        // in with no matching out → open/forgotten interval
+        {
+          badge: "0001",
+          timestamp: "2026-06-15T08:00:00+02:00",
+          direction: "in",
+        },
+      ],
+      leaves: [],
+    };
+    const report = await runSync(fixedSource(forgotten), odoo, opts);
+
+    expect(odoo.attendance).toHaveLength(0); // nothing written
+    expect(report.attendance.created).toBe(0);
+    expect(report.incompleteForReview).toHaveLength(1);
+    expect(report.incompleteForReview[0]).toMatchObject({ employeeId: 10 });
+    expect(report.hadErrors).toBe(false); // a forgotten punch is not an error
+  });
+
   it("records a fatal source error without throwing", async () => {
     const broken: FluidaSource = {
       name: "broken",

@@ -27,67 +27,90 @@ export interface FluidaSource {
 // --- REST API source --------------------------------------------------------
 
 export interface FluidaApiConfig {
-  baseUrl: string;
+  /** API base. Default `https://api.fluida.io`. */
+  baseUrl?: string;
+  /** Fluida app UUID — sent as `x-fluida-app-uuid`. Authenticates + scopes the company. */
   apiKey: string;
+  /** Fluida company id (UUID), used in the `{company_id}` path segment. */
+  companyId: string;
   timeoutMs?: number;
-  /** Override the punches path (default `/v1/timbrature`). */
-  punchesPath?: string;
-  /** Override the leaves path (default `/v1/assenze`). */
-  leavesPath?: string;
 }
 
 /**
- * Live source. The response-shape normalizers are deliberately lenient (accept
- * several common field names) so we adapt to the portal's actual payload with a
- * config tweak rather than a rewrite once credentials land.
+ * Live source against the real Fluida REST API (reverse-engineered from
+ * developer.fluida.io). Auth is the `x-fluida-app-uuid` header (NOT Bearer);
+ * the key both authenticates and scopes the company.
+ *
+ * - Punches: `GET /api/v1/stampings/list/{company_id}` — each stamping already
+ *   carries `badge_id`, `user_email`, `direction` (IN/OUT) and `server_clock_at`
+ *   (an absolute UTC instant), so no separate contracts lookup is needed.
+ * - Leaves:  `GET /api/v1/requests/list/{company_id}` — requires the key to be
+ *   granted the "requests" read scope in Fluida; fetched best-effort so a 401/
+ *   403 there never aborts the attendance sync (returns no leaves + the caller
+ *   sees an empty leaves list).
  */
 export class FluidaApiSource implements FluidaSource {
   readonly name = "fluida-api";
   constructor(private readonly cfg: FluidaApiConfig) {}
 
-  private async get(
-    path: string,
-    params: Record<string, string>,
-  ): Promise<unknown> {
-    const url = new URL(path, this.cfg.baseUrl);
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  private base(): string {
+    return (this.cfg.baseUrl ?? "https://api.fluida.io").replace(/\/+$/, "");
+  }
+
+  private async get(path: string): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
       this.cfg.timeoutMs ?? 30_000,
     );
     try {
-      const res = await fetch(url, {
+      return await fetch(`${this.base()}${path}`, {
         headers: {
-          Authorization: `Bearer ${this.cfg.apiKey}`,
+          "x-fluida-app-uuid": this.cfg.apiKey,
           Accept: "application/json",
         },
         signal: controller.signal,
       });
-      if (!res.ok) {
-        throw new Error(
-          `Fluida HTTP ${res.status} ${res.statusText} (${path})`,
-        );
-      }
-      return res.json();
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /** Fluida `*_date` params are calendar dates (YYYY-MM-DD). */
+  private static dateOnly(iso: string): string {
+    return new Date(iso).toISOString().slice(0, 10);
   }
 
   async fetch(
     rangeStartIso: string,
     rangeEndIso: string,
   ): Promise<FluidaExport> {
-    const params = { from: rangeStartIso, to: rangeEndIso };
-    const [rawPunches, rawLeaves] = await Promise.all([
-      this.get(this.cfg.punchesPath ?? "/v1/timbrature", params),
-      this.get(this.cfg.leavesPath ?? "/v1/assenze", params),
-    ]);
-    return {
-      punches: asArray(rawPunches).map(normalizeApiPunch),
-      leaves: asArray(rawLeaves).map(normalizeApiLeave),
-    };
+    const from = FluidaApiSource.dateOnly(rangeStartIso);
+    const to = FluidaApiSource.dateOnly(rangeEndIso);
+    const cid = encodeURIComponent(this.cfg.companyId);
+    const range = `from_date=${from}&to_date=${to}`;
+
+    // Punches — required. A non-OK here is a real failure.
+    const pRes = await this.get(`/api/v1/stampings/list/${cid}?${range}`);
+    if (!pRes.ok) {
+      throw new Error(
+        `Fluida stampings HTTP ${pRes.status} ${pRes.statusText}`,
+      );
+    }
+    const punches = asArray(await pRes.json()).map(normalizeApiPunch);
+
+    // Leaves — best-effort. The key may lack the "requests" scope (401/403),
+    // in which case we proceed with attendance only.
+    let leaves: FluidaLeave[] = [];
+    try {
+      const lRes = await this.get(`/api/v1/requests/list/${cid}?${range}`);
+      if (lRes.ok) {
+        leaves = asArray(await lRes.json()).map(normalizeApiLeave);
+      }
+    } catch {
+      // network/abort — leave `leaves` empty; attendance still syncs
+    }
+    return { punches, leaves };
   }
 }
 
@@ -106,6 +129,7 @@ const str = (v: unknown): string | undefined =>
   v == null ? undefined : String(v);
 
 function normalizeApiPunch(r: Record<string, unknown>): FluidaPunch {
+  // Real Fluida stamping fields: direction = "IN"/"OUT".
   const dirRaw = str(r.direction ?? r.verso ?? r.type)?.toLowerCase();
   const direction: FluidaPunch["direction"] =
     dirRaw === "in" || dirRaw === "entrata" || dirRaw === "entry"
@@ -114,9 +138,13 @@ function normalizeApiPunch(r: Record<string, unknown>): FluidaPunch {
         ? "out"
         : "unknown";
   return {
-    badge: str(r.badge ?? r.badgeCode ?? r.matricola ?? r.employeeBadge) ?? "",
-    email: str(r.email ?? r.userEmail),
-    timestamp: str(r.timestamp ?? r.datetime ?? r.time ?? r.data) ?? "",
+    // `badge_id` is the physical badge → hr.employee.barcode (primary key).
+    badge: str(r.badge_id ?? r.badge ?? r.badgeCode ?? r.matricola) ?? "",
+    // `user_email` is the fallback match key → hr.employee.work_email.
+    email: str(r.user_email ?? r.email ?? r.userEmail),
+    // `server_clock_at` is an absolute UTC instant (the punch time).
+    timestamp:
+      str(r.server_clock_at ?? r.timestamp ?? r.datetime ?? r.time) ?? "",
     direction,
     sourceId: str(r.id ?? r.uuid),
   };

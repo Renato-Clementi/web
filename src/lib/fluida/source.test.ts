@@ -40,7 +40,7 @@ describe("FluidaCsvSource", () => {
 });
 
 describe("FluidaApiSource", () => {
-  it("sends a bearer token and normalizes varied field names", async () => {
+  it("uses the x-fluida-app-uuid header and the real stamping fields", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -48,9 +48,11 @@ describe("FluidaApiSource", () => {
           JSON.stringify({
             data: [
               {
-                matricola: "0001",
-                datetime: "2026-06-15T08:00:00+02:00",
-                verso: "entrata",
+                id: "stamp-1",
+                badge_id: "0441dad2a61c90",
+                user_email: "mario@baboo.eu",
+                server_clock_at: "2026-06-15T06:00:00Z",
+                direction: "IN",
               },
             ],
           }),
@@ -62,38 +64,65 @@ describe("FluidaApiSource", () => {
 
     const src = new FluidaApiSource({
       baseUrl: "https://api.fluida.io",
-      apiKey: "secret",
+      apiKey: "secret-uuid",
+      companyId: "co-123",
     });
     const out = await src.fetch("2026-06-15T00:00:00Z", "2026-06-16T00:00:00Z");
 
     expect(out.punches).toEqual([
       {
-        badge: "0001",
-        email: undefined,
-        timestamp: "2026-06-15T08:00:00+02:00",
+        badge: "0441dad2a61c90",
+        email: "mario@baboo.eu",
+        timestamp: "2026-06-15T06:00:00Z",
         direction: "in",
-        sourceId: undefined,
+        sourceId: "stamp-1",
       },
     ]);
     const firstCall = fetchMock.mock.calls[0];
+    const url = String(firstCall[0]);
+    expect(url).toContain("/api/v1/stampings/list/co-123");
+    expect(url).toContain("from_date=2026-06-15");
     const headers = (firstCall[1] as RequestInit).headers as Record<
       string,
       string
     >;
-    expect(headers.Authorization).toBe("Bearer secret");
+    expect(headers["x-fluida-app-uuid"]).toBe("secret-uuid");
+    expect(headers.Authorization).toBeUndefined();
     vi.unstubAllGlobals();
   });
 
-  it("throws on a non-OK response", async () => {
+  it("throws when the punches (stampings) call is not OK", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response("nope", { status: 401 })),
+      vi.fn().mockResolvedValue(new Response("nope", { status: 500 })),
     );
     const src = new FluidaApiSource({
       baseUrl: "https://api.fluida.io",
       apiKey: "bad",
+      companyId: "co-123",
     });
-    await expect(src.fetch("a", "b")).rejects.toThrow(/401/);
+    await expect(
+      src.fetch("2026-06-15T00:00:00Z", "2026-06-16T00:00:00Z"),
+    ).rejects.toThrow(/500/);
+    vi.unstubAllGlobals();
+  });
+
+  it("still returns punches when the leaves call is unauthorized (401)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(new Response("denied", { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const src = new FluidaApiSource({
+      baseUrl: "https://api.fluida.io",
+      apiKey: "scoped-for-stampings-only",
+      companyId: "co-123",
+    });
+    const out = await src.fetch("2026-06-15T00:00:00Z", "2026-06-16T00:00:00Z");
+    expect(out.punches).toEqual([]);
+    expect(out.leaves).toEqual([]);
     vi.unstubAllGlobals();
   });
 });
