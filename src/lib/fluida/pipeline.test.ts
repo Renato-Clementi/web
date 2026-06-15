@@ -1,0 +1,144 @@
+import { describe, it, expect } from "vitest";
+import { runSync } from "./pipeline";
+import type { OdooHrPort } from "./odoo";
+import type { FluidaSource } from "./source";
+import type { AttendanceInterval, FluidaExport, LeaveRequest } from "./types";
+import type { EmployeeDirectoryEntry } from "./mapping";
+
+/** In-memory Odoo fake that records writes and supports idempotency lookups. */
+class FakeOdoo implements OdooHrPort {
+  attendance: (AttendanceInterval & { id: number })[] = [];
+  leaves: (LeaveRequest & { id: number })[] = [];
+  private seq = 1;
+  constructor(private readonly directory: EmployeeDirectoryEntry[]) {}
+
+  async listEmployees() {
+    return this.directory;
+  }
+  async findAttendance(employeeId: number, checkIn: string) {
+    const hit = this.attendance.find(
+      (a) => a.employeeId === employeeId && a.checkIn === checkIn,
+    );
+    return hit ? hit.id : null;
+  }
+  async createAttendance(interval: AttendanceInterval) {
+    const id = this.seq++;
+    this.attendance.push({ ...interval, id });
+    return id;
+  }
+  async updateAttendanceCheckOut(id: number, checkOut: string | null) {
+    const row = this.attendance.find((a) => a.id === id);
+    if (row) row.checkOut = checkOut;
+  }
+  async findLeave(
+    employeeId: number,
+    holidayStatusId: number,
+    dateFrom: string,
+  ) {
+    const hit = this.leaves.find(
+      (l) =>
+        l.employeeId === employeeId &&
+        l.holidayStatusId === holidayStatusId &&
+        l.dateFrom === dateFrom,
+    );
+    return hit ? hit.id : null;
+  }
+  async createLeave(req: LeaveRequest) {
+    const id = this.seq++;
+    this.leaves.push({ ...req, id });
+    return id;
+  }
+}
+
+function fixedSource(data: FluidaExport): FluidaSource {
+  return { name: "fixture", fetch: async () => data };
+}
+
+const directory: EmployeeDirectoryEntry[] = [
+  { id: 10, barcode: "0001", workEmail: "mario@baboo.eu" },
+  { id: 20, barcode: "0002", workEmail: "luigi@baboo.eu" },
+];
+
+const sample: FluidaExport = {
+  punches: [
+    { badge: "0001", timestamp: "2026-06-15T08:00:00+02:00", direction: "in" },
+    { badge: "0001", timestamp: "2026-06-15T17:00:00+02:00", direction: "out" },
+    { badge: "9999", timestamp: "2026-06-15T08:00:00+02:00", direction: "in" }, // unmapped
+  ],
+  leaves: [
+    {
+      badge: "0002",
+      leaveType: "Ferie",
+      start: "2026-06-15T00:00:00+02:00",
+      end: "2026-06-16T00:00:00+02:00",
+      approved: true,
+    },
+  ],
+};
+
+const opts = {
+  rangeStartIso: "2026-06-15T00:00:00Z",
+  rangeEndIso: "2026-06-16T00:00:00Z",
+  now: () => new Date("2026-06-16T01:00:00Z"),
+};
+
+describe("runSync", () => {
+  it("creates attendance + leave and reports unmatched records", async () => {
+    const odoo = new FakeOdoo(directory);
+    const report = await runSync(fixedSource(sample), odoo, opts);
+
+    expect(report.attendance.created).toBe(1);
+    expect(report.leave.created).toBe(1);
+    expect(report.unmatched).toEqual([
+      { badge: "9999", email: undefined, kind: "punch" },
+    ]);
+    expect(report.hadErrors).toBe(false);
+    expect(odoo.attendance[0]).toMatchObject({
+      employeeId: 10,
+      checkIn: "2026-06-15 06:00:00",
+      checkOut: "2026-06-15 15:00:00",
+    });
+    expect(odoo.leaves[0]).toMatchObject({
+      employeeId: 20,
+      holidayStatusId: 1,
+    });
+  });
+
+  it("is idempotent: a second run over the same data writes nothing new", async () => {
+    const odoo = new FakeOdoo(directory);
+    await runSync(fixedSource(sample), odoo, opts);
+    const second = await runSync(fixedSource(sample), odoo, opts);
+
+    expect(second.attendance.created).toBe(0);
+    expect(second.attendance.updated).toBe(1); // existing check_in re-touched
+    expect(second.leave.created).toBe(0);
+    expect(second.leave.skipped).toBe(1);
+    expect(odoo.attendance).toHaveLength(1);
+    expect(odoo.leaves).toHaveLength(1);
+  });
+
+  it("dry-run computes counts but performs no writes", async () => {
+    const odoo = new FakeOdoo(directory);
+    const report = await runSync(fixedSource(sample), odoo, {
+      ...opts,
+      dryRun: true,
+    });
+    expect(report.dryRun).toBe(true);
+    expect(report.attendance.created).toBe(1);
+    expect(report.leave.created).toBe(1);
+    expect(odoo.attendance).toHaveLength(0);
+    expect(odoo.leaves).toHaveLength(0);
+  });
+
+  it("records a fatal source error without throwing", async () => {
+    const broken: FluidaSource = {
+      name: "broken",
+      fetch: async () => {
+        throw new Error("portal down");
+      },
+    };
+    const report = await runSync(broken, new FakeOdoo(directory), opts);
+    expect(report.hadErrors).toBe(true);
+    expect(report.logs.some((l) => l.message.includes("aborted"))).toBe(true);
+  });
+});
