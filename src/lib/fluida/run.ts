@@ -5,6 +5,10 @@
  *   tsx src/lib/fluida/run.ts                 # last 24h, live write
  *   tsx src/lib/fluida/run.ts --dry-run       # compute only, no writes
  *   tsx src/lib/fluida/run.ts --since-hours=48
+ *   tsx src/lib/fluida/run.ts --from=2026-05-01 --to=2026-05-31 --dry-run
+ *                                             # explicit calendar window
+ *                                             # (--to is the inclusive last day),
+ *                                             # used for monthly back-fills.
  *
  * Source selection:
  *   - FLUIDA_API_KEY set  -> live REST source (FluidaApiSource)
@@ -69,11 +73,42 @@ async function buildSource(): Promise<FluidaSource> {
   });
 }
 
+/** Parse a calendar date (YYYY-MM-DD) as a UTC instant, or throw. */
+function parseDate(name: string, value: string, endOfDay: boolean): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`--${name} must be YYYY-MM-DD (got "${value}")`);
+  }
+  const d = new Date(`${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`--${name} is not a valid date ("${value}")`);
+  }
+  return d;
+}
+
 async function main(): Promise<void> {
   const dryRun = flag("dry-run");
-  const sinceHours = Number.parseInt(arg("since-hours") ?? "24", 10);
-  const end = new Date();
-  const start = new Date(end.getTime() - sinceHours * 3600_000);
+  const fromArg = arg("from");
+  const toArg = arg("to");
+
+  let start: Date;
+  let end: Date;
+  if (fromArg || toArg) {
+    // Explicit calendar window (monthly back-fill). --to is the INCLUSIVE last
+    // day: we extend it to 23:59:59.999Z so the source's date-only slice keeps
+    // that whole day in range.
+    if (!fromArg || !toArg) {
+      throw new Error("--from and --to must be supplied together.");
+    }
+    start = parseDate("from", fromArg, false);
+    end = parseDate("to", toArg, true);
+    if (start.getTime() > end.getTime()) {
+      throw new Error("--from must not be after --to.");
+    }
+  } else {
+    const sinceHours = Number.parseInt(arg("since-hours") ?? "24", 10);
+    end = new Date();
+    start = new Date(end.getTime() - sinceHours * 3600_000);
+  }
 
   const odooEnv = readOdooEnv();
   if (!odooEnv) {
