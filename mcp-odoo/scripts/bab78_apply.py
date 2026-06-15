@@ -42,16 +42,22 @@ TEAM_ID = 4
 # tag_id -> {"label": human label, "user_id": Odoo res.users id or None}
 # user_id stays None until the CEO confirms staffing (BAB-78). --apply will
 # refuse any rule with user_id is None; --dry-run lists them as PENDING.
+# Filled from the BAB-85 data-derived proposal, approved by the CEO as an ORG
+# decision (request_confirmation a6183af1 accepted 2026-06-15). Rationale lives
+# in the BAB-85 `routing-proposal` document. Mapping by department/role since
+# Odoo groups don't discriminate and fsm_dispatcher/equipment_manager groups
+# don't exist in this instance (Maintenance uninstalled).
 TEAM4_ROUTING = {
-    3: {"label": "Assistenza telefonica -> 1st-level phone support", "user_id": None},
-    4: {"label": "Manutenzione programmata -> Maintenance",          "user_id": None},
-    5: {"label": "Intervento in campo -> FSM dispatcher",            "user_id": None},
-    6: {"label": "Preventivo -> Sales (Plutus handoff)",             "user_id": None},
+    3: {"label": "Assistenza telefonica -> 1st-level phone support", "user_id": 13},  # Eva Barni (Amministrazione)
+    4: {"label": "Manutenzione programmata -> Maintenance",          "user_id": 14},  # Michele Beltrami (Ufficio tecnico/Ingegnere)
+    5: {"label": "Intervento in campo -> FSM dispatcher",            "user_id": 34},  # Mauro Clementi (Logistica e Delivery)
+    6: {"label": "Preventivo -> Sales (real user, not Plutus)",      "user_id": 24},  # Matilda Battistini (Commerciale/sale_mgr)
 }
 
-# member_ids to set on team 4 (balanced assignment fallback). Empty until CEO
-# confirms; --apply leaves member_ids untouched when this list is empty.
-TEAM4_MEMBER_IDS = []  # e.g. [13, 24, 34]
+# member_ids on team 4 = client-facing support core (the four assignees above).
+# CEO-approved (a6183af1). 310 Guillermo Moreno is the optional escalation
+# manager (left out to keep the team lean; board can add — reversible).
+TEAM4_MEMBER_IDS = [13, 24, 14, 34]
 
 RULE_NAME = "BAB-78 routing: {label}"
 
