@@ -127,17 +127,26 @@ def main():
             continue
         domain = (f"[('team_id','=',{TEAM_ID}),"
                   f"('tag_ids','in',[{tag_id}]),('user_id','=',False)]")
+        # safe_eval forbids STORE_ATTR (record.x = y); use .write().
         code = (f"for record in records:\n"
                 f"    if not record.user_id:\n"
                 f"        record.write({{'user_id': {user_id}}})")
+        # Odoo 18: base.automation has NO state/code; the server action is a
+        # separate ir.actions.server linked via action_server_ids (usage=
+        # 'base_automation'). Create both atomically via inline one2many.
         vals = {
             "name": name,
             "model_id": model_id,
-            "state": "code",
-            "code": code,
             "trigger": "on_create_or_write",
             "filter_domain": domain,
             "active": True,
+            "action_server_ids": [(0, 0, {
+                "name": name,
+                "model_id": model_id,
+                "state": "code",
+                "usage": "base_automation",
+                "code": code,
+            })],
         }
         if tag_field:
             vals["trigger_field_ids"] = [(6, 0, [tag_field])]
