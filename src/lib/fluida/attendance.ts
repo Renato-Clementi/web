@@ -6,9 +6,13 @@
  *  - sort chronologically and pair in->out into attendance intervals
  *  - deduplicate exact-duplicate punches (same instant + direction)
  *  - collapse repeated same-direction punches (double scans)
- *  - infer direction when the source reports `unknown` (alternating)
+ *  - pair by chronological position rather than trusting the direction label,
+ *    which Fluida sometimes reports out-of-order, inverted, or doubled. Labels
+ *    are used only as a same-instant tie-break and to flag the day as anomalous
+ *    for HR review (BAB-89). This recovers valid intervals from a mislabeled
+ *    sequence instead of emitting a misleading zero-hour record.
  *  - surface incomplete days (dangling in / orphan out) as warnings, never
- *    silently dropping data
+ *    silently dropping data or fabricating a check-out
  *
  * The function is intentionally side-effect free; persistence lives in
  * `odooSync.ts`. Idempotency on re-runs is achieved downstream by keying on
@@ -75,12 +79,24 @@ export function buildAttendance(
   return intervals;
 }
 
-/** Pair one employee-day's punches into intervals. */
+/** Warning attached to every interval of a day whose labels are untrustworthy. */
+const ANOMALY_WARNING =
+  "out-of-order / mislabeled punch sequence — paired by time, review needed";
+
+/** Direction sort rank for the same-instant tie-break: in before out before unknown. */
+function dirRank(d: ResolvedPunch["direction"]): number {
+  return d === "in" ? 0 : d === "out" ? 1 : 2;
+}
+
+/** Pair one employee-day's punches into intervals (positional / greedy). */
 function pairDay(punches: ResolvedPunch[]): AttendanceInterval[] {
   const employeeId = punches[0].employeeId;
-  const sorted = [...punches].sort(
-    (a, b) => a.instant.getTime() - b.instant.getTime(),
-  );
+  // Sort by instant; tie-break on direction so two punches at the very same
+  // instant pair as in->out, never out->in.
+  const sorted = [...punches].sort((a, b) => {
+    const dt = a.instant.getTime() - b.instant.getTime();
+    return dt !== 0 ? dt : dirRank(a.direction) - dirRank(b.direction);
+  });
 
   // 1) Drop exact duplicates (same direction within the dedup window).
   const deduped: ResolvedPunch[] = [];
@@ -96,66 +112,67 @@ function pairDay(punches: ResolvedPunch[]): AttendanceInterval[] {
     deduped.push(p);
   }
 
-  // 2) Infer unknown directions by alternating, starting with "in".
-  let expectIn = true;
-  const directed = deduped.map((p) => {
-    let dir = p.direction;
-    if (dir === "unknown") {
-      dir = expectIn ? "in" : "out";
-    }
-    expectIn = dir === "in" ? false : true;
-    return { ...p, direction: dir as "in" | "out" };
-  });
+  // 2) Decide whether the day's labels are trustworthy. A coherent day reads
+  //    in,out,in,out,... (even index = in). When a *known* label contradicts
+  //    its chronological position the directions are out-of-order / inverted /
+  //    doubled (the BAB-89 cases), so we stop trusting them and pair purely by
+  //    position below. "unknown" labels never count as a conflict.
+  const mislabeled = deduped.some(
+    (p, i) => p.direction !== "unknown" && p.direction !== expectedAt(i),
+  );
 
-  // 3) Walk the sequence pairing in->out.
+  // 3) Greedy positional pairing: (0,1), (2,3), ... regardless of label. This
+  //    recovers valid intervals from a scrambled sequence (e.g. Lorenzo's
+  //    morning, Tommaso's full day) instead of emitting a 0h record. A trailing
+  //    unpaired punch is an orphan: reported for review, never fabricated into a
+  //    check-out.
   const intervals: AttendanceInterval[] = [];
-  let open: ResolvedPunch | null = null;
-  for (const p of directed) {
-    if (p.direction === "in") {
-      if (open) {
-        // Two ins in a row: close the first as incomplete, start a new one.
-        intervals.push(openInterval(employeeId, open));
-        intervals[intervals.length - 1].warnings.push(
-          "missing check-out before a new check-in (incomplete attendance)",
-        );
-      }
-      open = p;
-    } else {
-      // direction === "out"
-      if (open) {
-        intervals.push(closedInterval(employeeId, open, p));
-        open = null;
-      } else {
-        // Orphan out with no preceding in: record a zero-length marker so the
-        // data isn't lost, and warn loudly.
-        intervals.push({
-          employeeId,
-          checkIn: toOdooUtc(p.instant),
-          checkOut: toOdooUtc(p.instant),
-          warnings: [
-            "check-out with no preceding check-in (orphan punch) — review needed",
-          ],
-        });
-      }
-    }
-  }
-  if (open) {
-    intervals.push(openInterval(employeeId, open));
-    intervals[intervals.length - 1].warnings.push(
-      "no check-out for the day (still open / forgotten punch)",
+  let i = 0;
+  for (; i + 1 < deduped.length; i += 2) {
+    intervals.push(
+      pairInterval(employeeId, deduped[i], deduped[i + 1], mislabeled),
     );
+  }
+  if (i < deduped.length) {
+    const last = deduped[i];
+    const iv = openInterval(employeeId, last);
+    iv.warnings.push(
+      last.direction === "out"
+        ? "check-out with no preceding check-in (orphan punch) — review needed"
+        : "no check-out for the day (still open / forgotten punch)",
+    );
+    if (mislabeled) iv.warnings.push(ANOMALY_WARNING);
+    intervals.push(iv);
   }
   return intervals;
 }
 
-function closedInterval(
+/** Expected direction for a punch at position `i` in a coherent day. */
+function expectedAt(i: number): "in" | "out" {
+  return i % 2 === 0 ? "in" : "out";
+}
+
+/**
+ * Build a closed interval from a positional in/out pair. If the pair would be
+ * zero-length or inverted (two punches at the same instant), it is surfaced as
+ * an open review item instead — a 0h `hr.attendance` is never produced.
+ */
+function pairInterval(
   employeeId: number,
   inP: ResolvedPunch,
   outP: ResolvedPunch,
+  mislabeled: boolean,
 ): AttendanceInterval {
   const warnings: string[] = [];
+  if (mislabeled) warnings.push(ANOMALY_WARNING);
   if (outP.instant.getTime() <= inP.instant.getTime()) {
-    warnings.push("check-out is not after check-in — review needed");
+    warnings.push("zero-length or out-of-order pair — review needed");
+    return {
+      employeeId,
+      checkIn: toOdooUtc(inP.instant),
+      checkOut: null,
+      warnings,
+    };
   }
   return {
     employeeId,
