@@ -50,7 +50,9 @@ async function main(): Promise<void> {
   const src = new FluidaApiSource({ apiKey, companyId: COMPANY_ID });
 
   const { punches } = await src.fetch(FROM, TO);
-  console.log(`Fetched ${punches.length} stampings ${FROM.slice(0, 10)}..${TO.slice(0, 10)}\n`);
+  console.log(
+    `Fetched ${punches.length} stampings ${FROM.slice(0, 10)}..${TO.slice(0, 10)}\n`,
+  );
 
   // Group punches by email -> date -> sorted punches
   const byEmail = new Map<string, typeof punches>();
@@ -64,8 +66,12 @@ async function main(): Promise<void> {
   const emails = [...byEmail.keys()];
   for (const f of FOCUS) {
     const tokens = f.name.toLowerCase().split(/\s+/);
-    const match = emails.find((e) => tokens.some((t) => t.length > 3 && e.includes(t)));
-    console.log(`=== emp ${f.emp} ${f.name}  ->  ${match ?? "(no email match in stampings)"}`);
+    const match = emails.find((e) =>
+      tokens.some((t) => t.length > 3 && e.includes(t)),
+    );
+    console.log(
+      `=== emp ${f.emp} ${f.name}  ->  ${match ?? "(no email match in stampings)"}`,
+    );
     if (!match) continue;
     const list = [...byEmail.get(match)!].sort((a, b) =>
       a.timestamp.localeCompare(b.timestamp),

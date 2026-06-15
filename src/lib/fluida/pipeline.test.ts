@@ -168,10 +168,26 @@ describe("runSync", () => {
     const odoo = new FakeOdoo(hrDirectory);
     const data: FluidaExport = {
       punches: [
-        { badge: "B7", timestamp: "2026-06-12T07:25:00+02:00", direction: "in" },
-        { badge: "B7", timestamp: "2026-06-12T13:44:00+02:00", direction: "out" },
-        { badge: "B7", timestamp: "2026-06-12T14:40:00+02:00", direction: "out" },
-        { badge: "B7", timestamp: "2026-06-12T15:40:00+02:00", direction: "in" },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T07:25:00+02:00",
+          direction: "in",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T13:44:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T14:40:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T15:40:00+02:00",
+          direction: "in",
+        },
       ],
       leaves: [],
     };
@@ -201,8 +217,16 @@ describe("runSync", () => {
     const odoo = new FakeOdoo(hrDirectory);
     const data: FluidaExport = {
       punches: [
-        { badge: "B17", timestamp: "2026-06-12T07:17:00+02:00", direction: "out" },
-        { badge: "B17", timestamp: "2026-06-12T18:27:00+02:00", direction: "in" },
+        {
+          badge: "B17",
+          timestamp: "2026-06-12T07:17:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B17",
+          timestamp: "2026-06-12T18:27:00+02:00",
+          direction: "in",
+        },
       ],
       leaves: [],
     };
@@ -223,12 +247,36 @@ describe("runSync", () => {
     const odoo = new FakeOdoo(hrDirectory);
     const data: FluidaExport = {
       punches: [
-        { badge: "B7", timestamp: "2026-06-12T07:25:00+02:00", direction: "in" },
-        { badge: "B7", timestamp: "2026-06-12T13:44:00+02:00", direction: "out" },
-        { badge: "B7", timestamp: "2026-06-12T14:40:00+02:00", direction: "out" },
-        { badge: "B7", timestamp: "2026-06-12T15:40:00+02:00", direction: "in" },
-        { badge: "B17", timestamp: "2026-06-12T07:17:00+02:00", direction: "out" },
-        { badge: "B17", timestamp: "2026-06-12T18:27:00+02:00", direction: "in" },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T07:25:00+02:00",
+          direction: "in",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T13:44:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T14:40:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B7",
+          timestamp: "2026-06-12T15:40:00+02:00",
+          direction: "in",
+        },
+        {
+          badge: "B17",
+          timestamp: "2026-06-12T07:17:00+02:00",
+          direction: "out",
+        },
+        {
+          badge: "B17",
+          timestamp: "2026-06-12T18:27:00+02:00",
+          direction: "in",
+        },
       ],
       leaves: [],
     };

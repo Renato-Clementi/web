@@ -119,9 +119,9 @@ describe("buildAttendance", () => {
     });
     // no degenerate 0h record, and the day is flagged for HR review
     expect(out.every((iv) => iv.checkIn !== iv.checkOut)).toBe(true);
-    expect(out.every((iv) => iv.warnings.join(" ").includes("mislabeled"))).toBe(
-      true,
-    );
+    expect(
+      out.every((iv) => iv.warnings.join(" ").includes("mislabeled")),
+    ).toBe(true);
   });
 
   it("recovers a full day from inverted directions (BAB-89: Tommaso 12/06)", () => {
