@@ -65,9 +65,12 @@ authenticates and scopes the company. Routes carry the company id:
 - Punches: `GET /api/v1/stampings/list/{company_id}?from_date=&to_date=` — each
   stamping already carries `badge_id`, `user_email`, `direction` (IN/OUT) and
   `server_clock_at` (absolute UTC), so no contracts lookup is needed.
-- Leaves: `GET /api/v1/requests/list/{company_id}` — **requires the key to be
-  granted the "requests" read scope** in Fluida. Until then it returns 401 and
-  the pipeline syncs attendance only (leaves fetched best-effort, never fatal).
+- Leaves: `GET /api/v1/requests/list/{company_id}` — **OFF by default** (BAB-93).
+  Ferie/permessi are now managed natively in Odoo (BAB-90) and the key is not
+  granted the "requests" scope (BAB-87 cancelled), so the call is skipped
+  entirely to keep the nightly logs free of a 401. Set `FLUIDA_LEAVES_ENABLED=1`
+  to re-enable it (only useful if Fluida later grants the scope); when on it is
+  still best-effort — a 401/403 there never aborts the attendance sync.
 
 ### Environment
 
@@ -78,6 +81,7 @@ authenticates and scopes the company. Routes carry the company id:
 | `FLUIDA_COMPANY_ID`                                                        | Fluida company id (UUID) used in the `{company_id}` path |
 | `FLUIDA_API_URL`                                                           | Override API base (default `https://api.fluida.io`)      |
 | `FLUIDA_PUNCHES_CSV` / `FLUIDA_LEAVES_CSV`                                 | CSV-fallback file paths (when no API key)                |
+| `FLUIDA_LEAVES_ENABLED`                                                    | Opt back into the API leaves fetch (default off, BAB-93) |
 | `FLUIDA_TZ`                                                                | Timezone of naive CSV timestamps (default `Europe/Rome`) |
 
 ### Scheduling
@@ -105,6 +109,9 @@ HR agent (Chronos).
 
 - ✅ **Attendance live & verified** — pilot load written to `hr.attendance`
   (`worked_hours` correctly nets the calendar lunch break). Idempotent re-runs.
-- ⏳ **Leaves → `hr.leave`** — blocked until the Fluida app-uuid key is granted
-  the `requests` read scope (Fluida portal, board/CEO). Code path is wired and
-  resilient; flips on automatically once the scope lands.
+- ➖ **Leaves → `hr.leave`** — **disabled by default (BAB-93).** Ferie/permessi
+  are managed natively in Odoo (BAB-90) and the `requests` scope will not be
+  granted (BAB-87 cancelled), so the nightly sync no longer calls the leaves
+  endpoint (no more log 401). The code in `leave.ts` + `FluidaApiSource` is left
+  intact and re-armable via `FLUIDA_LEAVES_ENABLED=1` should Fluida ever grant
+  the scope.

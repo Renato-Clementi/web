@@ -31,6 +31,12 @@ function arg(name: string): string | undefined {
 function flag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
+/** Truthy env flag: "1", "true", "yes", "on" (case-insensitive). */
+function envFlag(name: string): boolean {
+  return ["1", "true", "yes", "on"].includes(
+    (process.env[name] ?? "").trim().toLowerCase(),
+  );
+}
 
 async function buildSource(): Promise<FluidaSource> {
   const apiKey = process.env.FLUIDA_API_KEY?.trim();
@@ -45,6 +51,10 @@ async function buildSource(): Promise<FluidaSource> {
       baseUrl: process.env.FLUIDA_API_URL?.trim() || "https://api.fluida.io",
       apiKey,
       companyId,
+      // Ferie/permessi are native in Odoo (BAB-90); the leaves endpoint 401s
+      // without the (un-granted) "requests" scope, so it stays off unless
+      // explicitly opted in. See BAB-93.
+      leavesEnabled: envFlag("FLUIDA_LEAVES_ENABLED"),
     });
   }
   const punchesPath = process.env.FLUIDA_PUNCHES_CSV?.trim();

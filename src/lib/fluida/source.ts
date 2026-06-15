@@ -33,6 +33,14 @@ export interface FluidaApiConfig {
   apiKey: string;
   /** Fluida company id (UUID), used in the `{company_id}` path segment. */
   companyId: string;
+  /**
+   * Fetch approved leaves from `/api/v1/requests/list/{company_id}`.
+   * Default `false`: ferie/permessi are managed natively in Odoo (BAB-90) and
+   * the Fluida key is not granted the "requests" scope (BAB-87 cancelled), so
+   * calling that endpoint only yields a nightly 401 that clutters the logs.
+   * Flip on (via `FLUIDA_LEAVES_ENABLED`) only if Fluida later grants the scope.
+   */
+  leavesEnabled?: boolean;
   timeoutMs?: number;
 }
 
@@ -44,10 +52,11 @@ export interface FluidaApiConfig {
  * - Punches: `GET /api/v1/stampings/list/{company_id}` — each stamping already
  *   carries `badge_id`, `user_email`, `direction` (IN/OUT) and `server_clock_at`
  *   (an absolute UTC instant), so no separate contracts lookup is needed.
- * - Leaves:  `GET /api/v1/requests/list/{company_id}` — requires the key to be
- *   granted the "requests" read scope in Fluida; fetched best-effort so a 401/
- *   403 there never aborts the attendance sync (returns no leaves + the caller
- *   sees an empty leaves list).
+ * - Leaves:  `GET /api/v1/requests/list/{company_id}` — OFF by default
+ *   (`leavesEnabled`, see config). Ferie/permessi live natively in Odoo
+ *   (BAB-90) and the key lacks the "requests" scope (BAB-87 cancelled), so the
+ *   call is skipped entirely to avoid a nightly 401 in the logs. When enabled
+ *   it is still best-effort — a 401/403 never aborts the attendance sync.
  */
 export class FluidaApiSource implements FluidaSource {
   readonly name = "fluida-api";
@@ -99,16 +108,19 @@ export class FluidaApiSource implements FluidaSource {
     }
     const punches = asArray(await pRes.json()).map(normalizeApiPunch);
 
-    // Leaves — best-effort. The key may lack the "requests" scope (401/403),
-    // in which case we proceed with attendance only.
+    // Leaves — OFF by default (ferie are native in Odoo, see BAB-90/BAB-93).
+    // When explicitly enabled it is best-effort: the key may lack the
+    // "requests" scope (401/403), in which case we proceed with attendance only.
     let leaves: FluidaLeave[] = [];
-    try {
-      const lRes = await this.get(`/api/v1/requests/list/${cid}?${range}`);
-      if (lRes.ok) {
-        leaves = asArray(await lRes.json()).map(normalizeApiLeave);
+    if (this.cfg.leavesEnabled) {
+      try {
+        const lRes = await this.get(`/api/v1/requests/list/${cid}?${range}`);
+        if (lRes.ok) {
+          leaves = asArray(await lRes.json()).map(normalizeApiLeave);
+        }
+      } catch {
+        // network/abort — leave `leaves` empty; attendance still syncs
       }
-    } catch {
-      // network/abort — leave `leaves` empty; attendance still syncs
     }
     return { punches, leaves };
   }

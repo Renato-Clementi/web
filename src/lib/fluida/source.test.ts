@@ -107,7 +107,30 @@ describe("FluidaApiSource", () => {
     vi.unstubAllGlobals();
   });
 
-  it("still returns punches when the leaves call is unauthorized (401)", async () => {
+  it("does NOT call the leaves endpoint by default (no nightly 401)", async () => {
+    // Leaves are off by default (BAB-93): ferie are native in Odoo, the key
+    // lacks the "requests" scope. Only the stampings call should fire.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const src = new FluidaApiSource({
+      baseUrl: "https://api.fluida.io",
+      apiKey: "scoped-for-stampings-only",
+      companyId: "co-123",
+    });
+    const out = await src.fetch("2026-06-15T00:00:00Z", "2026-06-16T00:00:00Z");
+    expect(out.punches).toEqual([]);
+    expect(out.leaves).toEqual([]);
+    // Exactly one HTTP call (stampings); the requests/leaves endpoint is skipped.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/stampings/list/");
+    vi.unstubAllGlobals();
+  });
+
+  it("fetches leaves when leavesEnabled, but a 401 there never aborts the sync", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -119,10 +142,13 @@ describe("FluidaApiSource", () => {
       baseUrl: "https://api.fluida.io",
       apiKey: "scoped-for-stampings-only",
       companyId: "co-123",
+      leavesEnabled: true,
     });
     const out = await src.fetch("2026-06-15T00:00:00Z", "2026-06-16T00:00:00Z");
     expect(out.punches).toEqual([]);
     expect(out.leaves).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/requests/list/");
     vi.unstubAllGlobals();
   });
 });
